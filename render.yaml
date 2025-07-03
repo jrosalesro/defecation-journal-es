@@ -1,0 +1,7 @@
+services:
+  - type: cron
+    name: defecation-morning
+    schedule: "0 7 * * *"
+    env: python
+    buildCommand: ""
+    startCommand: "python defecation.py"
