@@ -22,9 +22,9 @@ import nest_asyncio
 nest_asyncio.apply()
 
 # 🔐 Configuración
-OPENAI_API_KEY   = "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"
-TELEGRAM_TOKEN   = "8129182291:AAHAPZBznw-NHQBfO6IDa6bwMpbr_fCHF94"
-TELEGRAM_CHAT_ID = "@defecation_journal_es"
+OPENAI_API_KEY   = os.getenv("OPENAI_API_KEY")
+TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
