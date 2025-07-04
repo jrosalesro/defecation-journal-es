@@ -177,5 +177,7 @@ async def publicar():
         else:
             print(f"❌ Error de Telegram: {e}")
 
-# ⏩ Ejecutar desde Colab
-await publicar()
+import asyncio
+
+if __name__ == "__main__":
+    asyncio.run(publicar())
