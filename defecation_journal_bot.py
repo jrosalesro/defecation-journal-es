@@ -10,6 +10,7 @@ Original file is located at
 # 👇 Instala automáticamente los paquetes si faltan
 #!pip install -q feedparser python-telegram-bot openai nest_asyncio
 
+import os
 import openai
 import feedparser
 import telegram
