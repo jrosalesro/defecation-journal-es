@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import os
 import openai
 import feedparser
@@ -9,7 +8,6 @@ from datetime import datetime
 import random
 import nest_asyncio
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import DBSCAN
 from collections import defaultdict
 
@@ -18,7 +16,6 @@ nest_asyncio.apply()
 OPENAI_API_KEY   = os.getenv("OPENAI_API_KEY")
 TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
 
 openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
@@ -33,21 +30,24 @@ RSS_FEEDS = {
         "https://rss.elconfidencial.com/espana/"
     ],
     "internacional": [
-        "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/internacional/portada",
-        "https://www.eldiario.es/internacional/rss/",
-        "https://www.europapress.es/rss/rss.aspx?ch=68",
-        "https://www.lavanguardia.com/mvc/feed/rss/internacional.xml"
+        "https://feeds.bbci.co.uk/news/world/rss.xml",
+        "https://www.nytimes.com/svc/collections/v1/publish/http://www.nytimes.com/section/world/rss.xml",
+        "https://english.aljazeera.net/xml/rss/all.xml",
+        "https://rss.dw.com/rdf/rss-en-world",
+        "https://www.theguardian.com/world/rss"
     ],
     "economia": [
-        "https://e00-expansion.uecdn.es/rss/economia.xml",
-        "https://www.eleconomista.es/rss/rss-economia.php",
-        "https://cincodias.elpais.com/seccion/economia/rss.xml"
+        "https://www.cnbc.com/id/10001147/device/rss/rss.html",
+        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+        "https://www.economist.com/the-world-this-week/rss.xml",
+        "https://www.ft.com/?format=rss",
+        "https://www.bloomberg.com/feed/podcast/etf-report.xml"
     ],
     "wtf": [
-        "https://verne.elpais.com/rss/lo-mas.xml",
-        "https://www.eldiario.es/caballodenietzsche/rss/",
-        "https://www.publico.es/rss/agencias/cultura/",
-        "https://nmas1.org/feed"
+        "https://www.theonion.com/rss",
+        "https://not-the-onion.reddit.com/.rss",
+        "https://www.huffpost.com/section/weird-news/feed",
+        "https://boingboing.net/feed"
     ]
 }
 
@@ -96,41 +96,7 @@ Noticias:
     )
     return response.choices[0].message.content.strip()
 
-async def generar_bloques_por_categoria(titulares):
-    categorias = ["nacional", "internacional", "economia", "wtf"]
-    secciones = {
-        "nacional": "🇪🇸 Nacional",
-        "internacional": "🌍 Internacional",
-        "economia": "💰 Economía",
-        "wtf": "🫠 WTF"
-    }
-    bloques_finales = []
-    log_texto = ""
-
-    for cat in categorias:
-        subtitulares = [t for t in titulares if t['categoria'] == cat]
-        if not subtitulares:
-            continue
-        embeddings = await obtener_embeddings(subtitulares)
-        labels = agrupar_por_similitud(embeddings)
-
-        grupos = defaultdict(list)
-        for idx, etiqueta in enumerate(labels):
-            grupos[etiqueta].append(subtitulares[idx])
-
-        grupos_ordenados = sorted(grupos.values(), key=lambda g: -len(g))[:3]
-
-        if grupos_ordenados:
-            bloques_finales.append("━━━━━━━━━━━━━━━")
-            bloques_finales.append(f"{secciones[cat]}")
-        for grupo in grupos_ordenados:
-            resumen = await resumir_grupo(grupo)
-            bloques_finales.append(resumen)
-            log_texto += f"[{cat.upper()}] Grupo de {len(grupo)} titulares:\n" + "\n".join(f"- {t['titulo']}" for t in grupo) + "\n\n"
-
-    return "\n\n".join(bloques_finales), log_texto
-
-def crear_mensaje_final(cuerpo, momento):
+def crear_intro_y_cierre(momento):
     intro = {
         "mañana": "¡Buenos días! Aquí tienes la edición matinal del *Defecation Journal*, el diario que lees mientras haces lo que nadie más quiere hablar.",
         "tarde": "¡Hora de la pausa! Llega la edición vespertina del *Defecation Journal*, ideal para esos momentos donde el baño es tu sala de prensa privada.",
@@ -141,7 +107,7 @@ def crear_mensaje_final(cuerpo, momento):
         "Gracias por leer donde más se piensa. ¡Hasta la próxima sentada!",
         "No olvides tirar de la cadena... y de este canal. 💩"
     ])
-    return f"{intro[momento]}\n\n{cuerpo}\n\n🎭 {cierre}"
+    return intro[momento], cierre
 
 async def publicar():
     print("📰 Obteniendo titulares...")
@@ -150,26 +116,64 @@ async def publicar():
     hora = datetime.now().hour
     momento = "mañana" if hora < 12 else "tarde" if hora < 20 else "noche"
 
-    print("🧠 Agrupando y resumiendo...")
-    cuerpo, log_texto = await generar_bloques_por_categoria(titulares)
-
-    mensaje = crear_mensaje_final(cuerpo, momento)
+    intro, cierre = crear_intro_y_cierre(momento)
 
     cabeceras = {
-      "mañana": "https://i.imgur.com/tAJ6WfR.jpg",
-      "tarde": "https://i.imgur.com/XMEWksd.jpg",
-      "noche": "https://i.imgur.com/z3DcnUs.jpg"
+        "mañana": "https://i.postimg.cc/PfvY2z7H/edicion-matinal.png",
+        "tarde":  "https://i.postimg.cc/K88YsmYT/edicion-vespertina.png",
+        "noche":  "https://i.postimg.cc/TPWfZ1vK/edicion-nocturna.png"
     }
 
-    print("📤 Publicando en Telegram...")
     try:
-        await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento])
+        # Imagen e intro SIN notificación
+        await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento], disable_notification=True)
+        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=intro, parse_mode="Markdown", disable_web_page_preview=True, disable_notification=True)
 
-        if len(mensaje) > 4000:
-            print(f"⚠️ Mensaje demasiado largo ({len(mensaje)} caracteres). Recortando...")
-            mensaje = mensaje[:3990] + "..."
+        categorias = ["nacional", "internacional", "economia", "wtf"]
+        secciones = {
+            "nacional": "**🇪🇸 NACIONAL**",
+            "internacional": "**🌍 INTERNACIONAL**",
+            "economia": "**💰 ECONOMÍA**",
+            "wtf": "**🫠 WTF**"
+        }
 
-        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=mensaje, parse_mode="Markdown", disable_web_page_preview=True)
+        log_texto = ""
+        for cat in categorias:
+            subtitulares = [t for t in titulares if t['categoria'] == cat]
+            if not subtitulares:
+                continue
+            embeddings = await obtener_embeddings(subtitulares)
+            labels = agrupar_por_similitud(embeddings)
+
+            grupos = defaultdict(list)
+            for idx, etiqueta in enumerate(labels):
+                grupos[etiqueta].append(subtitulares[idx])
+
+            grupos_ordenados = sorted(grupos.values(), key=lambda g: -len(g))[:3]
+            if not grupos_ordenados:
+                continue
+
+            bloque = f"{secciones[cat]}\n\n"
+            for grupo in grupos_ordenados:
+                resumen = await resumir_grupo(grupo)
+                bloque += resumen + "\n\n"
+                log_texto += f"[{cat.upper()}] Grupo de {len(grupo)} titulares:\n" + "\n".join(f"- {t['titulo']}" for t in grupo) + "\n\n"
+
+            await bot.send_message(
+                chat_id=TELEGRAM_CHAT_ID,
+                text=bloque.strip(),
+                parse_mode="Markdown",
+                disable_web_page_preview=True,
+                disable_notification=True  # Secciones SIN notificación
+            )
+
+        # Cierre CON notificación
+        await bot.send_message(
+            chat_id=TELEGRAM_CHAT_ID,
+            text=f"🎭 {cierre}",
+            parse_mode="Markdown",
+            disable_web_page_preview=True  # <- pero SÍ con notificación
+        )
 
         with open("publicacion.log", "w", encoding="utf-8") as f:
             f.write(log_texto)
@@ -180,8 +184,3 @@ async def publicar():
 
 if __name__ == "__main__":
     asyncio.run(publicar())
-    try:
-        from google.colab import files
-        files.download("publicacion.log")
-    except:
-        pass
