@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
+import json
 import openai
 import feedparser
 import telegram
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import nest_asyncio
 import numpy as np
@@ -13,12 +14,15 @@ from collections import defaultdict
 
 nest_asyncio.apply()
 
-OPENAI_API_KEY   = os.getenv("OPENAI_API_KEY")
-TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN")
+# Configuración
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
+
+HISTORIAL_PATH = "historial_noticias.json"
 
 RSS_FEEDS = {
     "nacional": [
@@ -51,6 +55,32 @@ RSS_FEEDS = {
     ]
 }
 
+# 🔁 Funciones de historial
+def cargar_historial():
+    if os.path.exists(HISTORIAL_PATH):
+        with open(HISTORIAL_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+def guardar_historial(historial):
+    with open(HISTORIAL_PATH, "w", encoding="utf-8") as f:
+        json.dump(historial, f, ensure_ascii=False, indent=2)
+
+def limpiar_historial(historial, dias=3):
+    limite = datetime.utcnow() - timedelta(days=dias)
+    return [item for item in historial if datetime.fromisoformat(item["fecha"]) > limite]
+
+def similitud_coseno(a, b):
+    a, b = np.array(a), np.array(b)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+def es_noticia_duplicada(embedding_nuevo, historial, umbral=0.85):
+    for item in historial:
+        if similitud_coseno(embedding_nuevo, item["embedding"]) > umbral:
+            return True
+    return False
+
+# 🔎 Lectura de noticias
 def obtener_titulares():
     entradas = []
     for categoria, urls in RSS_FEEDS.items():
@@ -77,6 +107,7 @@ def agrupar_por_similitud(embeddings, eps=0.3):
     clustering = DBSCAN(eps=eps, min_samples=1, metric="cosine").fit(embeddings)
     return clustering.labels_
 
+# ✍️ Resumen con GPT
 async def resumir_grupo(grupo):
     prompt = """Eres un redactor sarcástico para un canal de Telegram. Resume las siguientes noticias en menos de 4 líneas, combinando un tono serio con ironía. Elige un titular representativo y proporciona un solo enlace.
 
@@ -109,13 +140,14 @@ def crear_intro_y_cierre(momento):
     ])
     return intro[momento], cierre
 
+# 🚀 Publicación
 async def publicar():
     print("📰 Obteniendo titulares...")
     titulares = obtener_titulares()
+    historial = limpiar_historial(cargar_historial())
 
     hora = datetime.now().hour
     momento = "mañana" if hora < 12 else "tarde" if hora < 20 else "noche"
-
     intro, cierre = crear_intro_y_cierre(momento)
 
     cabeceras = {
@@ -125,7 +157,6 @@ async def publicar():
     }
 
     try:
-        # Imagen e intro SIN notificación
         await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento], disable_notification=True)
         await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=intro, parse_mode="Markdown", disable_web_page_preview=True, disable_notification=True)
 
@@ -142,6 +173,7 @@ async def publicar():
             subtitulares = [t for t in titulares if t['categoria'] == cat]
             if not subtitulares:
                 continue
+
             embeddings = await obtener_embeddings(subtitulares)
             labels = agrupar_por_similitud(embeddings)
 
@@ -155,25 +187,43 @@ async def publicar():
 
             bloque = f"{secciones[cat]}\n\n"
             for grupo in grupos_ordenados:
+                titulo_representativo = grupo[0]["titulo"]
+                emb_resp = await openai_client.embeddings.create(
+                    model="text-embedding-3-small",
+                    input=titulo_representativo
+                )
+                emb_vector = emb_resp.data[0].embedding
+
+                if es_noticia_duplicada(emb_vector, historial):
+                    continue
+
                 resumen = await resumir_grupo(grupo)
                 bloque += resumen + "\n\n"
                 log_texto += f"[{cat.upper()}] Grupo de {len(grupo)} titulares:\n" + "\n".join(f"- {t['titulo']}" for t in grupo) + "\n\n"
 
-            await bot.send_message(
-                chat_id=TELEGRAM_CHAT_ID,
-                text=bloque.strip(),
-                parse_mode="Markdown",
-                disable_web_page_preview=True,
-                disable_notification=True  # Secciones SIN notificación
-            )
+                historial.append({
+                    "fecha": datetime.utcnow().isoformat(),
+                    "titulo": titulo_representativo,
+                    "embedding": emb_vector
+                })
 
-        # Cierre CON notificación
+            if bloque.strip() != secciones[cat]:
+                await bot.send_message(
+                    chat_id=TELEGRAM_CHAT_ID,
+                    text=bloque.strip(),
+                    parse_mode="Markdown",
+                    disable_web_page_preview=True,
+                    disable_notification=True
+                )
+
         await bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
             text=f"🎭 {cierre}",
             parse_mode="Markdown",
-            disable_web_page_preview=True  # <- pero SÍ con notificación
+            disable_web_page_preview=True
         )
+
+        guardar_historial(historial)
 
         with open("publicacion.log", "w", encoding="utf-8") as f:
             f.write(log_texto)
