@@ -142,9 +142,13 @@ def crear_intro_y_cierre(momento):
 
 # 🚀 Publicación
 async def publicar():
+    print("🚀 Iniciando publicación del Defecation Journal")
     print("📰 Obteniendo titulares...")
     titulares = obtener_titulares()
+    print(f"🔍 Se encontraron {len(titulares)} titulares en total.")
+
     historial = limpiar_historial(cargar_historial())
+    print(f"🗂️ Historial cargado con {len(historial)} entradas tras limpieza.")
 
     hora = datetime.now().hour
     momento = "mañana" if hora < 12 else "tarde" if hora < 20 else "noche"
@@ -159,6 +163,7 @@ async def publicar():
     try:
         await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento], disable_notification=True)
         await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=intro, parse_mode="Markdown", disable_web_page_preview=True, disable_notification=True)
+        print(f"🖼️ Imagen y cabecera para '{momento}' enviada.")
 
         categorias = ["nacional", "internacional", "economia", "wtf"]
         secciones = {
@@ -169,8 +174,12 @@ async def publicar():
         }
 
         log_texto = ""
+        total_publicados = 0
+
         for cat in categorias:
+            print(f"\n📚 Procesando categoría: {cat.upper()}")
             subtitulares = [t for t in titulares if t['categoria'] == cat]
+            print(f"   - {len(subtitulares)} titulares encontrados.")
             if not subtitulares:
                 continue
 
@@ -183,6 +192,7 @@ async def publicar():
 
             grupos_ordenados = sorted(grupos.values(), key=lambda g: -len(g))[:3]
             if not grupos_ordenados:
+                print("   - No hay grupos significativos.")
                 continue
 
             bloque = f"{secciones[cat]}\n\n"
@@ -195,6 +205,7 @@ async def publicar():
                 emb_vector = emb_resp.data[0].embedding
 
                 if es_noticia_duplicada(emb_vector, historial):
+                    print(f"⛔ Grupo descartado por duplicado: {titulo_representativo}")
                     continue
 
                 resumen = await resumir_grupo(grupo)
@@ -207,6 +218,9 @@ async def publicar():
                     "embedding": emb_vector
                 })
 
+                total_publicados += 1
+                print(f"✅ Grupo publicado: {titulo_representativo}")
+
             if bloque.strip() != secciones[cat]:
                 await bot.send_message(
                     chat_id=TELEGRAM_CHAT_ID,
@@ -216,19 +230,24 @@ async def publicar():
                     disable_notification=True
                 )
 
-        await bot.send_message(
-            chat_id=TELEGRAM_CHAT_ID,
-            text=f"🎭 {cierre}",
-            parse_mode="Markdown",
-            disable_web_page_preview=True
-        )
+        if total_publicados == 0:
+            print("⚠️ No se publicó ningún grupo. Todo era duplicado o no había suficiente contenido.")
+        else:
+            await bot.send_message(
+                chat_id=TELEGRAM_CHAT_ID,
+                text=f"🎭 {cierre}",
+                parse_mode="Markdown",
+                disable_web_page_preview=True
+            )
+            print("📤 Cierre enviado.")
 
         guardar_historial(historial)
 
         with open("publicacion.log", "w", encoding="utf-8") as f:
             f.write(log_texto)
 
-        print("✅ Publicado correctamente.")
+        print("✅ Publicación completada con éxito.")
+
     except Exception as e:
         print(f"❌ Error al publicar: {e}")
 
