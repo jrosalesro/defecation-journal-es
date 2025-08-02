@@ -245,7 +245,7 @@ async def publicar():
                 chat_id=TELEGRAM_CHAT_ID,
                 text=m.strip(),
                 parse_mode="HTML",
-                disable_web_page_preview=False,
+                disable_web_page_preview=True,
                 # disable_notification=False
             )
 
