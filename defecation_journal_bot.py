@@ -158,19 +158,19 @@ async def publicar():
 
     categorias = ["nacional", "internacional", "economia", "wtf"]
     secciones = {
-        "nacional": "**🇪🇸 NACIONAL**",
-        "internacional": "**🌍 INTERNACIONAL**",
-        "economia": "**💰 ECONOMÍA**",
-        "wtf": "**🫠 WTF**"
+        "nacional": "<b>🇪🇸 NACIONAL</b>",
+        "internacional": "<b>🌍 INTERNACIONAL</b>",
+        "economia": "<b>💰 ECONOMÍA</b>",
+        "wtf": "<b>🫠 WTF</b>"
     }
-
-    mensaje_completo = intro + "\n\n"
-    log_texto = ""
-    total_publicados = 0
 
     try:
         await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento], disable_notification=True)
         print(f"🖼️ Imagen para '{momento}' enviada.")
+
+        mensaje_completo = intro + "\n\n"
+        log_texto = ""
+        total_publicados = 0
 
         for cat in categorias:
             print(f"\n📚 Procesando categoría: {cat.upper()}")
@@ -188,7 +188,6 @@ async def publicar():
 
             grupos_ordenados = sorted(grupos.values(), key=lambda g: -len(g))[:3]
             if not grupos_ordenados:
-                print("   - No hay grupos significativos.")
                 continue
 
             bloque = f"{secciones[cat]}\n\n"
@@ -205,7 +204,13 @@ async def publicar():
                     continue
 
                 resumen = await resumir_grupo(grupo)
-                bloque += resumen + "\n\n"
+                lineas = resumen.strip().split("\n")
+                titulo = lineas[0].replace("📌", "").strip("* ")
+                contenido = "\n".join(lineas[1:-1]).strip()
+                enlace = lineas[-1].split("(", 1)[-1].strip(") ")
+
+                bloque += f"📌 <b>{titulo}</b>\n{contenido}\n🔗 <a href=\"{enlace}\">Fuente</a>\n\n"
+
                 log_texto += f"[{cat.upper()}] Grupo de {len(grupo)} titulares:\n" + "\n".join(f"- {t['titulo']}" for t in grupo) + "\n\n"
 
                 historial.append({
@@ -217,24 +222,31 @@ async def publicar():
                 total_publicados += 1
                 print(f"✅ Grupo publicado: {titulo_representativo}")
 
-            if bloque.strip() != secciones[cat]:
-                mensaje_completo += bloque.strip() + "\n\n"
+            mensaje_completo += bloque.strip() + "\n\n"
 
         mensaje_completo += f"🎭 {cierre}"
+        guardar_historial(historial)
 
-        if total_publicados == 0:
-            print("⚠️ No se publicó ningún grupo. Todo era duplicado o no había suficiente contenido.")
-        else:
+        # Enviar en bloques si supera el límite
+        MAX_LEN = 4096
+        bloques = []
+        actual = ""
+        for linea in mensaje_completo.strip().splitlines(keepends=True):
+            if len(actual) + len(linea) > MAX_LEN:
+                bloques.append(actual)
+                actual = ""
+            actual += linea
+        if actual:
+            bloques.append(actual)
+
+        for m in bloques:
             await bot.send_message(
                 chat_id=TELEGRAM_CHAT_ID,
-                text=mensaje_completo.strip(),
-                parse_mode="Markdown",
+                text=m.strip(),
+                parse_mode="HTML",
                 disable_web_page_preview=True,
                 disable_notification=True
             )
-            print("📤 Mensaje único enviado con toda la publicación.")
-
-        guardar_historial(historial)
 
         with open("publicacion.log", "w", encoding="utf-8") as f:
             f.write(log_texto)
