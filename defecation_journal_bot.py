@@ -18,6 +18,7 @@ nest_asyncio.apply()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+MODO_TEST = True
 
 openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
@@ -200,7 +201,7 @@ async def publicar():
                 )
                 emb_vector = emb_resp.data[0].embedding
 
-                if es_noticia_duplicada(emb_vector, historial):
+                if not MODO_TEST and es_noticia_duplicada(emb_vector, historial):
                     print(f"⛔ Grupo descartado por duplicado: {titulo_representativo}")
                     continue
 
@@ -245,7 +246,7 @@ async def publicar():
                 chat_id=TELEGRAM_CHAT_ID,
                 text=m.strip(),
                 parse_mode="HTML",
-                disable_web_page_preview=True,
+                disable_web_page_preview=False,
                 # disable_notification=True
             )
 
