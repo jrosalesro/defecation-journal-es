@@ -55,7 +55,6 @@ RSS_FEEDS = {
     ]
 }
 
-# 🔁 Funciones de historial
 def cargar_historial():
     if os.path.exists(HISTORIAL_PATH):
         with open(HISTORIAL_PATH, "r", encoding="utf-8") as f:
@@ -80,7 +79,6 @@ def es_noticia_duplicada(embedding_nuevo, historial, umbral=0.85):
             return True
     return False
 
-# 🔎 Lectura de noticias
 def obtener_titulares():
     entradas = []
     for categoria, urls in RSS_FEEDS.items():
@@ -107,7 +105,6 @@ def agrupar_por_similitud(embeddings, eps=0.3):
     clustering = DBSCAN(eps=eps, min_samples=1, metric="cosine").fit(embeddings)
     return clustering.labels_
 
-# ✍️ Resumen con GPT
 async def resumir_grupo(grupo):
     prompt = """Eres un redactor sarcástico para un canal de Telegram. Resume las siguientes noticias en menos de 4 líneas, combinando un tono serio con ironía. Elige un titular representativo y proporciona un solo enlace.
 
@@ -140,7 +137,6 @@ def crear_intro_y_cierre(momento):
     ])
     return intro[momento], cierre
 
-# 🚀 Publicación
 async def publicar():
     print("🚀 Iniciando publicación del Defecation Journal")
     print("📰 Obteniendo titulares...")
@@ -160,21 +156,21 @@ async def publicar():
         "noche":  "https://i.postimg.cc/TPWfZ1vK/edicion-nocturna.png"
     }
 
+    categorias = ["nacional", "internacional", "economia", "wtf"]
+    secciones = {
+        "nacional": "**🇪🇸 NACIONAL**",
+        "internacional": "**🌍 INTERNACIONAL**",
+        "economia": "**💰 ECONOMÍA**",
+        "wtf": "**🫠 WTF**"
+    }
+
+    mensaje_completo = intro + "\n\n"
+    log_texto = ""
+    total_publicados = 0
+
     try:
         await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento], disable_notification=True)
-        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=intro, parse_mode="Markdown", disable_web_page_preview=True, disable_notification=True)
-        print(f"🖼️ Imagen y cabecera para '{momento}' enviada.")
-
-        categorias = ["nacional", "internacional", "economia", "wtf"]
-        secciones = {
-            "nacional": "**🇪🇸 NACIONAL**",
-            "internacional": "**🌍 INTERNACIONAL**",
-            "economia": "**💰 ECONOMÍA**",
-            "wtf": "**🫠 WTF**"
-        }
-
-        log_texto = ""
-        total_publicados = 0
+        print(f"🖼️ Imagen para '{momento}' enviada.")
 
         for cat in categorias:
             print(f"\n📚 Procesando categoría: {cat.upper()}")
@@ -222,24 +218,21 @@ async def publicar():
                 print(f"✅ Grupo publicado: {titulo_representativo}")
 
             if bloque.strip() != secciones[cat]:
-                await bot.send_message(
-                    chat_id=TELEGRAM_CHAT_ID,
-                    text=bloque.strip(),
-                    parse_mode="Markdown",
-                    disable_web_page_preview=True,
-                    disable_notification=True
-                )
+                mensaje_completo += bloque.strip() + "\n\n"
+
+        mensaje_completo += f"🎭 {cierre}"
 
         if total_publicados == 0:
             print("⚠️ No se publicó ningún grupo. Todo era duplicado o no había suficiente contenido.")
         else:
             await bot.send_message(
                 chat_id=TELEGRAM_CHAT_ID,
-                text=f"🎭 {cierre}",
+                text=mensaje_completo.strip(),
                 parse_mode="Markdown",
-                disable_web_page_preview=True
+                disable_web_page_preview=True,
+                disable_notification=True
             )
-            print("📤 Cierre enviado.")
+            print("📤 Mensaje único enviado con toda la publicación.")
 
         guardar_historial(historial)
 
