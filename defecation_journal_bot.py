@@ -166,7 +166,7 @@ async def publicar():
     }
 
     try:
-        # await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento], disable_notification=True)
+        await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento], disable_notification=True)
         print(f"🖼️ Imagen para '{momento}' enviada.")
 
         mensaje_completo = intro + "\n\n"
