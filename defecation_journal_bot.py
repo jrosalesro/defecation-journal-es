@@ -168,9 +168,8 @@ async def publicar():
     try:
         # await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=cabeceras[momento], disable_notification=True)
         print(f"🖼️ Imagen para '{momento}' enviada.")
-        mensaje_completo = f'{cabeceras[momento]}\n\n{intro}\n\n'
 
-        # mensaje_completo = intro + "\n\n"
+        mensaje_completo = intro + "\n\n"
         log_texto = ""
         total_publicados = 0
 
@@ -247,7 +246,7 @@ async def publicar():
                 text=m.strip(),
                 parse_mode="HTML",
                 disable_web_page_preview=False,
-                # disable_notification=True
+                # disable_notification=False
             )
 
         with open("publicacion.log", "w", encoding="utf-8") as f:
