@@ -173,8 +173,8 @@ async def publicar():
     intro, cierre = crear_intro_y_cierre(momento)
 
     cabeceras = {
-        "mañana": "https://i.postimg.cc/PfvY2z7H/edicion-matinal.png",
-        "tarde":  "https://i.postimg.cc/K88YsmYT/edicion-vespertina.png",
+        "mañana": "https://i.postimg.cc/Gp71dHZz/defectaion-journal-ma-ana.png",
+        "tarde":  "https://i.postimg.cc/7Y38bBF5/defectaion-journal-vespertina.png",
         "noche":  "https://i.postimg.cc/qRxMskY3/defectaion-journal-noche.png"
     }
 
