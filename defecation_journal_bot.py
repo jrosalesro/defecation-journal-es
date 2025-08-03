@@ -154,7 +154,11 @@ Texto:
             ],
             temperature=0.9
         )
-        return response.choices[0].message.content.strip()
+        texto = response.choices[0].message.content.strip()
+        # Elimina bloques de código tipo ```html si existen
+        if texto.startswith("```") and texto.endswith("```"):
+            texto = "\n".join(linea for linea in texto.splitlines() if not linea.strip().startswith("```")).strip()
+        return texto
     except Exception as e:
         print(f"❌ Error reformulando el mensaje: {e}")
         return texto_original
@@ -249,12 +253,10 @@ async def publicar():
         mensaje_completo += f"🎭 {cierre}"
         guardar_historial(historial)
 
-        # 🧠 Reformular texto completo si está activado
         if REVISAR_ESTILO:
             print("🧠 Reformulando el texto para mejorar estilo y evitar repeticiones...")
             mensaje_completo = await reformular_mensaje(mensaje_completo)
 
-        # Dividir en bloques si supera el límite
         MAX_LEN = 4096
         bloques = []
         actual = ""
