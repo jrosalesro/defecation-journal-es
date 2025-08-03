@@ -18,7 +18,8 @@ nest_asyncio.apply()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-MODO_TEST = False
+MODO_TEST = True
+REVISAR_ESTILO = True
 
 openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
@@ -138,6 +139,26 @@ def crear_intro_y_cierre(momento):
     ])
     return intro[momento], cierre
 
+async def reformular_mensaje(texto_original: str) -> str:
+    prompt = f"""Revisa y reformula el siguiente texto manteniendo el tono irónico y sarcástico, pero evitando expresiones repetitivas o frases hechas comunes como "porque claro", "como no podía ser de otra forma", "obviamente", etc. Varía el estilo para que suene más fresco y natural, sin perder humor ni el formato HTML.
+
+Texto:
+{texto_original}
+"""
+    try:
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Eres un editor de estilo con gran sentido del humor e ironía."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.9
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"❌ Error reformulando el mensaje: {e}")
+        return texto_original
+
 async def publicar():
     print("🚀 Iniciando publicación del Defecation Journal")
     print("📰 Obteniendo titulares...")
@@ -228,7 +249,12 @@ async def publicar():
         mensaje_completo += f"🎭 {cierre}"
         guardar_historial(historial)
 
-        # Enviar en bloques si supera el límite
+        # 🧠 Reformular texto completo si está activado
+        if REVISAR_ESTILO:
+            print("🧠 Reformulando el texto para mejorar estilo y evitar repeticiones...")
+            mensaje_completo = await reformular_mensaje(mensaje_completo)
+
+        # Dividir en bloques si supera el límite
         MAX_LEN = 4096
         bloques = []
         actual = ""
@@ -246,7 +272,7 @@ async def publicar():
                 text=m.strip(),
                 parse_mode="HTML",
                 disable_web_page_preview=True,
-                # disable_notification=False
+                disable_notification=False
             )
 
         with open("publicacion.log", "w", encoding="utf-8") as f:
