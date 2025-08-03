@@ -18,7 +18,7 @@ nest_asyncio.apply()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-MODO_TEST = True
+MODO_TEST = False
 REVISAR_ESTILO = True
 
 openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
@@ -175,7 +175,7 @@ async def publicar():
     cabeceras = {
         "mañana": "https://i.postimg.cc/PfvY2z7H/edicion-matinal.png",
         "tarde":  "https://i.postimg.cc/K88YsmYT/edicion-vespertina.png",
-        "noche":  "https://i.postimg.cc/TPWfZ1vK/edicion-nocturna.png"
+        "noche":  "https://i.postimg.cc/qRxMskY3/defectaion-journal-noche.png"
     }
 
     categorias = ["nacional", "internacional", "economia", "wtf"]
